@@ -67,6 +67,7 @@ jobs:
           python -m unittest app.modules.concat.test_routes -v
           python -m unittest discover -s app/modules/uploader/tests -p 'test_*.py' -v
           python -m unittest discover -s tests -p 'test_admin_security.py' -v
+          python -m unittest discover -s tests -p 'test_release_security_contract.py' -v
           bash -n deploy/guarded-release.sh
           python -m pip wheel --no-deps --wheel-dir /tmp/concat-wheel .
       - name: Join existing VPS_1 production tailnet (OIDC)
