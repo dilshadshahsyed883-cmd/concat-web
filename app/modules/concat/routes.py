@@ -48,7 +48,7 @@ def _manager(request: Request, principal: Principal):
 def _csrf(request: Request):
     actual = request.headers.get("X-Cloud-Render-CSRF", "")
     expected = request.cookies.get("concat_csrf", "")
-    if not _CSRF.fullmatch(expected) or not hmac.compare_digest(actual, expected):
+    if not _CSRF.fullmatch(expected or "") or not hmac.compare_digest(actual, expected or ""):
         raise HTTPException(403, "Concat Studio CSRF token required")
     origin = request.app.state.settings.origin
     for header in ("origin", "referer"):
@@ -62,7 +62,7 @@ def _csrf(request: Request):
 
 def _page(request: Request, principal: Principal, index: int):
     token = request.cookies.get("concat_csrf", "")
-    if not _CSRF.fullmatch(token):
+    if not _CSRF.fullmatch(token or ""):
         token = secrets.token_urlsafe(32)
     reply = _TEMPLATES.TemplateResponse(
         request=request, name="cloud_render.html",
