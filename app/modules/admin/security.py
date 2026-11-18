@@ -243,13 +243,13 @@ class SecurityService:
             return None
         return principal
 
-    def csrf(self, request: Request) -> str | None:
-        # The token itself is stored only in the client's authenticated session
-        # cookie companion. Its hash is checked against the revocable server row.
+    def csrf_token(self, request: Request) -> str | None:
+        """Return a secret-bound CSRF value only for an authenticated session."""
         row = self._raw_session(request)
-        if row is None:
+        token = request.cookies.get(COOKIE, "")
+        if row is None or not token:
             return None
-        return row["csrf_hash"]
+        return hmac.new(self.secret, ("csrf." + token).encode("utf-8"), hashlib.sha256).hexdigest()
 
     def verify_csrf(self, request: Request) -> None:
         row = self._raw_session(request)
@@ -309,7 +309,7 @@ class SecurityService:
         now = int(time.time())
         max_age = self._config()["session_max_minutes"] * 60
         token = secrets.token_urlsafe(48)
-        csrf = secrets.token_urlsafe(32)
+        csrf = hmac.new(self.secret, ("csrf." + token).encode("utf-8"), hashlib.sha256).hexdigest()
         with self._local() as db:
             # Atomic one-time consumption; never reuse tickets even after logout.
             try:
