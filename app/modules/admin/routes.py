@@ -15,7 +15,7 @@ from pydantic import BaseModel, StrictBool, conint
 from app.auth import Principal, admin_principal, current_principal
 from app.modules.admin.security import (
     COOKIE, STATE_COOKIE, _safe_return_path, get_security, require_csrf,
-    SecurityService,
+    SecurityUnavailable,
 )
 
 router = APIRouter()
@@ -49,8 +49,11 @@ async def scene_callback(request: Request, ticket: str = "", state: str = ""):
     cookie_state = request.cookies.get(STATE_COOKIE, "")
     if not cookie_state or len(cookie_state) < 32 or len(state) > 200 or not secrets.compare_digest(cookie_state, state):
         raise HTTPException(401, "Invalid Scene SSO state")
-    username, sid_hash, jti_hash = service.validate_ticket(ticket, state)
-    token, _, max_age = service.create_session(username, sid_hash, jti_hash)
+    try:
+        username, sid_hash, jti_hash = service.validate_ticket(ticket, state)
+        token, _, max_age = service.create_session(username, sid_hash, jti_hash)
+    except SecurityUnavailable as exc:
+        raise HTTPException(503, "Scene SSO session verification unavailable") from exc
     service.revoke_cookie(request)  # rotate any prior Concat browser session
     response = RedirectResponse("/dashboard", status_code=303, headers=PRIVATE)
     response.delete_cookie(STATE_COOKIE, path="/", secure=True, httponly=True)
