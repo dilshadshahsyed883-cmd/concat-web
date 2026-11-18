@@ -27,7 +27,7 @@ sys.path.insert(0, str(ENGINE.parent))
 from lum_engine.concat_sheet import preview_sheet_videos
 
 VIDEO_ID = "abcde12345"
-LINK = f"https://app.scenebuilder.online/api/cloud-render/media/{VIDEO_ID}/file"
+LINK = f"https://concat.scenebuilder.online/api/cloud-render/media/{VIDEO_ID}/file"
 BYTES = b"\x00\x00\x00\x14ftypisom" + (b"verified-frame" * 100)
 
 
@@ -36,18 +36,18 @@ class ConcatUploaderSourceTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
         self.cloud = root / "cloud-render"
-        self.media = self.cloud / "media"
+        self.media = self.cloud / "owners" / hashlib.sha256(b"owner1").hexdigest() / "media"
         self.media.mkdir(parents=True)
         self.stage = root / "isolated-staging"
         self.sha = hashlib.sha256(BYTES).hexdigest()
         (self.media / (VIDEO_ID + ".mp4")).write_bytes(BYTES)
-        self.db = self.cloud / "cloud_render.sqlite3"
+        self.db = self.media.parent / "cloud_render.sqlite3"
         with sqlite3.connect(self.db) as con:
             con.execute("""CREATE TABLE files (
                 id TEXT, name TEXT, size INTEGER, sha256 TEXT,
-                state TEXT, owner_username TEXT)""")
-            con.execute("INSERT INTO files VALUES(?,?,?,?,?,?)", (
-                VIDEO_ID, "completed.mp4", len(BYTES), self.sha, "ready", "owner1"))
+                state TEXT)""")
+            con.execute("INSERT INTO files VALUES(?,?,?,?,?)", (
+                VIDEO_ID, "completed.mp4", len(BYTES), self.sha, "ready"))
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -78,21 +78,25 @@ class ConcatUploaderSourceTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "unavailable"):
                     self.submit(owner=username)
 
-    def test_legacy_media_without_owner_column_denied(self):
-        with sqlite3.connect(self.db) as con:
-            con.execute("DROP TABLE files")
+    def test_ownerless_global_legacy_database_is_never_used(self):
+        # Simulate a leftover Scene database with a matching ID; neither this
+        # database nor its MP4 may be adopted by the independent Concat Web.
+        with sqlite3.connect(self.cloud / "cloud_render.sqlite3") as con:
             con.execute("CREATE TABLE files (id TEXT, name TEXT, size INTEGER, sha256 TEXT, state TEXT)")
             con.execute("INSERT INTO files VALUES(?,?,?,?,?)",
-                        (VIDEO_ID, "video.mp4", len(BYTES), self.sha, "ready"))
-        with self.assertRaisesRegex(ValueError, "isolation"):
+                        (VIDEO_ID, "legacy.mp4", len(BYTES), self.sha, "ready"))
+        self.db.unlink()
+        with self.assertRaisesRegex(ValueError, "owner storage"):
             self.submit()
+        self.assertTrue((self.cloud / "cloud_render.sqlite3").is_file())
+
 
     def test_malformed_or_external_urls_never_requested(self):
         rejected = [
             "http://app.scenebuilder.online/api/cloud-render/media/abcde12345/file",
             "https://evil.example/api/cloud-render/media/abcde12345/file",
-            "https://app.scenebuilder.online.evil.example/api/cloud-render/media/abcde12345/file",
-            "https://app.scenebuilder.online/api/cloud-render/media/../file",
+            "https://concat.scenebuilder.online.evil.example/api/cloud-render/media/abcde12345/file",
+            "https://concat.scenebuilder.online/api/cloud-render/media/../file",
             LINK + "?download=1",
             LINK + "#foo",
             LINK.replace("/media/", "/media/%61"),
