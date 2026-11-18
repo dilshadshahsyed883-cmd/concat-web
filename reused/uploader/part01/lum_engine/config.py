@@ -41,7 +41,9 @@ if os.getenv("LUM_ENGINE_INSTANCE") == "concat":
             or DATA_ROOT.is_symlink()
             or DATA_ROOT.resolve() in forbidden
             or DATA_ROOT.name.casefold() in {"lum-copyright", "lum1", "copyright-uploader"}
-            or BASE_PATH != "/concat-studio/concat-uploader"
+            or (BASE_PATH != "/concat-studio/concat-uploader" and
+                not (BASE_PATH == "/concat-uploader" and
+                     os.getenv("CONCAT_WEB_IN_PROCESS") == "1"))
             or not SUITE_AUTH_ENABLED):
         raise RuntimeError("Concat Uploader requires a dedicated data root, canonical base path and trusted Scene SSO")
     # Fail closed rather than silently allowing an operator to point the shared

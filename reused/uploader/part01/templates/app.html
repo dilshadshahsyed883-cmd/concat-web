@@ -8,7 +8,7 @@
 
 
 
-  {% if (tab != 'auto_stream' or engine_instance == 'engine1') and engine_instance not in ['song', 'shortstudio', 'copyright'] %}
+  {% if (tab != 'auto_stream' or engine_instance == 'engine1') and engine_instance not in ['song', 'shortstudio', 'copyright', 'concat'] %}
   <nav class="lum-primary-workspaces" aria-label="Auto Uploader main subtabs">
     <a class="{{ 'active' if tab != 'auto_stream' else '' }}" href="{{ base_path }}/app?tab=dashboard" aria-current="{{ 'page' if tab != 'auto_stream' else 'false' }}">Auto Uploader</a>
     <a class="{{ 'active' if tab == 'auto_stream' else '' }}" href="/auto-stream/" aria-current="{{ 'page' if tab == 'auto_stream' else 'false' }}">Auto Stream</a>
@@ -624,7 +624,7 @@
 
     <div data-lum-channel-panel="accounts" hidden>
       {{ auth_panel(False) }}
-      {% if engine_instance == "copyright" %}
+      {% if engine_instance in ["copyright","concat"] %}
       <section class="lum-card">
         <div class="lum-card-head"><div>
           <h2>Permanent OAuth &amp; Token Vault</h2>
@@ -731,7 +731,7 @@
       {% if engine_instance in ['song','copyright','concat'] %}<details class="lum-note lum-sheet-format-help"><summary>Sheet format</summary>{% else %}<div class="lum-note">{% endif %}
         Expected first-tab headers: Sr, ip, Browser Profile, Channel Name's, Channel Link's, Gmail's, Password's, Backup code's, Back Up Key's, Group, Status, Notes.
         Multiple groups in one cell may be separated by comma, semicolon, or |. Removed rows disappear from current inventory while saved tokens/history are retained.
-      {% if engine_instance in ['song','copyright'] %}</details>{% else %}</div>{% endif %}
+      {% if engine_instance in ['song','copyright','concat'] %}</details>{% else %}</div>{% endif %}
 
       <form method="post" action="{{ base_path }}/actions/sheets/save" data-lum-soft-form class="lum-sheet-source-form">
         <input type="hidden" name="csrf_token" value="{{ csrf }}">
