@@ -25,4 +25,4 @@ Fixtures verify a signed-in receiver's simulated output, verified MP4, copied pe
 
 ## Release status
 
-No merge or deployment authorized. Upstream Scene SSO issuer/session table is pending in VPS_1 issue #772. Real OAuth/YouTube/Salad and full multi-user deployed verification require controlled non-production staging after SSO. See docs/FINAL_INTEGRATION_BLOCKERS_20261118.md and deploy/RELEASE_GATES.md. Main, VPS_1 production data, secrets, Nginx, and GPU images are untouched.
+Concat Web integration PR #7 and upstream Scene SSO issuer PR #773 have merged into their respective main branches. **A source merge is not a VPS deployment.** The live Scene SSO issuer/database schema, independent secrets, HTTPS ticket-log redaction, and real OAuth/YouTube/Salad/two-user verification must be accepted before public exposure. A manual, environment-gated Concat-only release workflow and rollback-safe script are available in .github/workflows/deploy.yml and deploy/GUARDED_RELEASE.md. No production change is implied by that workflow. The 2026-11-18 blocker document is a historical snapshot.
