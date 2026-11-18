@@ -102,8 +102,26 @@ class SecurityService:
         self.bootstrap_admins = {x.casefold() for x in bootstrap_admins if _valid_username(x)}
         if not self.scene_database.is_file():
             raise SecurityUnavailable("Scene account database unavailable")
+        if self.scene_database == self.security_database:
+            raise SecurityUnavailable("Scene and Concat databases must be separate")
         if not self.security_database.parent.is_dir():
             raise SecurityUnavailable("Concat auth storage directory missing")
+        # SQLite uses the process umask for newly created files. Pre-create the
+        # session store privately; never overwrite Scene or follow a hard link.
+        if not self.security_database.exists():
+            try:
+                fd = os.open(str(self.security_database), os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+                os.close(fd)
+            except OSError as exc:
+                raise SecurityUnavailable("Private Concat auth storage unavailable") from exc
+        import stat
+        info = self.security_database.stat()
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise SecurityUnavailable("Invalid Concat auth storage file")
+        try:
+            os.chmod(self.security_database, 0o600)
+        except OSError as exc:
+            raise SecurityUnavailable("Cannot secure Concat auth storage file") from exc
         self._initialize()
 
     @classmethod
@@ -311,6 +329,8 @@ class SecurityService:
         token = secrets.token_urlsafe(48)
         csrf = hmac.new(self.secret, ("csrf." + token).encode("utf-8"), hashlib.sha256).hexdigest()
         with self._local() as db:
+            # Retain replay markers well beyond the maximum ticket lifetime.
+            db.execute("DELETE FROM used_tickets WHERE expires_at<?", (now,))
             # Atomic one-time consumption; never reuse tickets even after logout.
             try:
                 db.execute("INSERT INTO used_tickets(jti_hash,expires_at) VALUES (?,?)",
