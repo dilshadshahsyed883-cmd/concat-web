@@ -70,7 +70,10 @@ class GatewayTests(unittest.TestCase):
             with self.subTest(path=path):
                 response = self.client.get("/concat-uploader/" + path)
                 self.assertEqual(response.status_code, 200, response.text)
-                result = response.json()
+                self.assertIn('class="uploader-frame"', response.text)
+                self.assertIn('/concat-uploader/app?tab=' + expected_tab, response.text)
+                self.assertEqual(response.text.count('class="nav-group"'), 3)
+                result = self.client.get("/concat-uploader/app?tab=" + expected_tab).json()
                 self.assertEqual(result["query"]["tab"], expected_tab)
                 self.assertEqual(result["path"], "/concat-uploader/app")
                 self.assertEqual(result["principal"], "alice")
@@ -78,7 +81,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(self.client.get("/concat-uploader/").status_code, 200)
 
     def test_untrusted_headers_never_set_identity_or_admin(self):
-        response = self.client.get("/concat-uploader/queue", headers={
+        response = self.client.get("/concat-uploader/app?tab=queue", headers={
             "X-Auth-User": "other-owner", "X-Is-Admin": "1",
             "X-App-Access": "all", "X-Forwarded-User": "evil",
         })
@@ -119,6 +122,8 @@ class GatewayTests(unittest.TestCase):
         self.assertFalse(gateway._allowed("actions/copyright/profile", "POST"))
         self.assertFalse(gateway._allowed("actions/copyright/metadata/-2", "POST"))
         self.assertFalse(gateway._allowed("users/1/update", "POST"))
+        self.assertFalse(gateway._allowed("actions/google-oauth/connect", "POST"))
+        self.assertFalse(gateway._allowed("oauth/google/callback", "GET"))
         self.assertFalse(gateway._allowed("static/../setup", "GET"))
         self.assertFalse(gateway._allowed("static/%2e%2e/setup", "GET"))
         self.assertFalse(gateway._allowed("api/copyright/folder-videos", "GET"))
