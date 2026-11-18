@@ -43,4 +43,4 @@ initialization. ASGI shutdown stops the worker. Queues start paused and require
 manual Start Queue, even after a restart; YouTube uploads preserve resumability,
 verified cleanup, owner+channel duplicate detection and per-channel OAuth.
 
-**Integrated media contract:** The new Concat Web database is isolated by a verified owner SHA-256 directory, so the original files schema has no owner_username. The handoff validates the exact owner directory and checks the MP4 SHA before private staging. Legacy single-DB sources still require matching non-null owner_username. Upstream Scene SSO issue #772 and real OAuth/Salad/YouTube acceptance remain release blockers.
+**Integrated media contract:** The new Concat Web database is isolated by a verified owner SHA-256 directory, so the original files schema has no owner_username. The handoff validates the exact owner directory and checks the MP4 SHA before private staging. Legacy single-DB sources are always quarantined and cannot be used as a fallback, even if they contain owner_username. Upstream Scene SSO issue #772 and real OAuth/Salad/YouTube acceptance remain release blockers.
