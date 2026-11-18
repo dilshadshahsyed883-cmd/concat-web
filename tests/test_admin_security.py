@@ -228,6 +228,34 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.post("/auth/logout", token=alice_csrf).status_code,303)
         self.assertEqual(self.client.get("/dashboard").status_code,401)
 
+    def test_legacy_and_foreign_records_hidden_for_every_resource_family(self):
+        principals = [
+            Principal("alice", is_active=True, concat_granted=True),
+            Principal("root", is_admin=True, is_active=True, concat_granted=True),
+        ]
+        for category, app in (
+            ("render_job", "concat"), ("completed_media", "concat"),
+            ("gpu_config", "concat"), ("channel", "concat-uploader"),
+            ("oauth_credential", "concat-uploader"), ("upload_queue", "concat-uploader"),
+            ("sheet", "concat-uploader"), ("thumbnail", "concat-uploader"),
+        ):
+            for principal in principals:
+                for bad in (
+                    {"id": category + "-bob", "owner_username": "bob", "app": app},
+                    {"id": category + "-legacy", "app": app},
+                    {"id": category + "-default", "owner_username": "__default__", "app": app},
+                ):
+                    with self.subTest(category=category, caller=principal.username, record=bad["id"]):
+                        with self.assertRaises(HTTPException) as caught:
+                            ensure_owner(principal, bad, app)
+                        self.assertEqual(caught.exception.status_code, 404)
+
+    def test_sessions_store_is_private_and_distinct_from_scene(self):
+        from stat import S_IMODE
+        self.assertNotEqual(self.auth_db.resolve(), self.scene_db.resolve())
+        self.assertEqual(S_IMODE(self.auth_db.stat().st_mode), 0o600)
+        self.assertEqual(self.client.get("/api/v1/session").status_code, 401)
+
     def test_scene_session_table_required_fail_closed(self):
         with sqlite3.connect(self.scene_db) as db:
             db.execute("DROP TABLE concat_sso_sessions")
