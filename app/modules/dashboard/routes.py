@@ -34,10 +34,10 @@ async def overview(request: Request,
     try:
         data = await get_overview(request.app, principal.username, limit=limit)
     except SourceUnavailable:
-        raise HTTPException(status_code=503, detail="Live dashboard sources unavailable")
+        raise HTTPException(status_code=503, detail="Live dashboard sources unavailable", headers=_NO_STORE)
     except InvalidSnapshot:
         _logger.error("Dashboard producer returned invalid or cross-owner data")
-        raise HTTPException(status_code=502, detail="Live dashboard data failed validation")
+        raise HTTPException(status_code=502, detail="Live dashboard data failed validation", headers=_NO_STORE)
     return JSONResponse(data, headers=_NO_STORE)
 
 
