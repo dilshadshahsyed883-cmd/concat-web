@@ -151,7 +151,7 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(first.status_code, 303)
         # Restore the original nonce in the local test browser: the signed JTI
         # must remain rejected even with a matching CSRF state cookie.
-        self.client.cookies.set(STATE_COOKIE, state, path="/", secure=True)
+        self.client.cookies.set(STATE_COOKIE, state, path="/")
         self.assertEqual(self.client.get("/auth/scene/callback",
                          params={"ticket": ticket, "state": state}).status_code, 401)
 
