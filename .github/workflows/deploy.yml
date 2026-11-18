@@ -1,0 +1,79 @@
+name: Concat Web guarded VPS release
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Exact reviewed concat-web/main commit SHA (40 lowercase hex)'
+        required: true
+        type: string
+
+# Manual release only until host/SSO acceptance is complete. No automatic deployment.
+permissions:
+  contents: read
+concurrency:
+  group: concat-web-production-release
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' && vars.CONCAT_WEB_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    environment: concat-web-production
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+          persist-credentials: false
+      - name: Reject unreviewed or stale commit
+        env:
+          RELEASE_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git fetch --no-tags --depth=1 origin refs/heads/main
+          test "$(git rev-parse FETCH_HEAD)" = "$RELEASE_SHA"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          bash -n deploy/guarded-release.sh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Focused integration, build and security acceptance
+        run: |
+          set -Eeuo pipefail
+          python -m pip install -e '.[test]'
+          python -m compileall -q app reused run.py
+          python -m unittest discover -s tests -p 'test_foundation.py' -v
+          python -m unittest discover -s tests -p 'test_reused_*.py' -v
+          python -m unittest discover -s tests -p 'test_admin_security.py' -v
+          python -m unittest app.modules.concat.test_routes -v
+          python -m unittest discover -s app/modules/uploader/tests -p 'test_*.py' -v
+      - name: Build immutable wheelhouse for isolated VPS release
+        run: |
+          set -Eeuo pipefail
+          mkdir -p release/wheelhouse
+          python -m pip wheel --wheel-dir release/wheelhouse .
+          cp run.py release/run.py
+          tar -C release -czf release.tgz run.py wheelhouse
+      - name: Deploy only Concat unit over pinned SSH (rollback on failure)
+        env:
+          RELEASE_SHA: ${{ inputs.commit_sha }}
+          DEPLOY_HOST: ${{ secrets.CONCAT_VPS_HOST }}
+          DEPLOY_USER: ${{ secrets.CONCAT_VPS_USER }}
+          DEPLOY_KEY: ${{ secrets.CONCAT_VPS_SSH_PRIVATE_KEY }}
+          DEPLOY_HOST_KEYS: ${{ secrets.CONCAT_VPS_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9.-]+$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          test -n "$DEPLOY_KEY"
+          test -n "$DEPLOY_HOST_KEYS"
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/concat_deploy_key"
+          printf '%s\n' "$DEPLOY_HOST_KEYS" > "$HOME/.ssh/concat_known_hosts"
+          ssh-keygen -F "$DEPLOY_HOST" -f "$HOME/.ssh/concat_known_hosts" >/dev/null
+          options=(-i "$HOME/.ssh/concat_deploy_key" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/concat_known_hosts" -o IdentitiesOnly=yes)
+          remote="/tmp/concat-web-$RELEASE_SHA-$GITHUB_RUN_ID.tgz"
+          scp "${options[@]}" release.tgz "$DEPLOY_USER@$DEPLOY_HOST:$remote"
+          ssh "${options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "sudo -n bash -s -- '$RELEASE_SHA' '$remote'" < deploy/guarded-release.sh
