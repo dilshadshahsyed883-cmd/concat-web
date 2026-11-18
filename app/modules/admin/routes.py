@@ -20,7 +20,7 @@ from app.modules.admin.security import (
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
-PRIVATE = {"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY"}
+PRIVATE = {"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer"}
 
 
 @router.get("/auth/scene/start")
