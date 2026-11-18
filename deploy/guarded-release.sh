@@ -16,6 +16,7 @@ flock -n 9 || fail "another Concat release is active"
 # separately; this script will never silently create auth grants or weaken security.
 id concatweb >/dev/null 2>&1 || fail "dedicated concatweb user missing"
 [[ -d /var/lib/concat-web ]] || fail "private data root missing"
+runuser -u concatweb -- test -w /var/lib/concat-web || fail "concatweb cannot write its private data root"
 [[ -d /srv/concat-web/releases ]] || fail "independent release directory missing"
 [[ -f /etc/concat-web/concat-web.env ]] || fail "private environment file missing"
 [[ "$(stat -c %a /etc/concat-web/concat-web.env)" == "600" ]] || fail "environment file must be mode 0600"
@@ -115,5 +116,13 @@ if [[ "$healthy" -ne 1 ]] ||
       grep -Fq '"service":"concat-web"'; then
   rollback
   fail "local or public health check failed"
+fi
+# Verify anonymous access is denied on both loopback and the public HTTPS route.
+# Never treat a public health endpoint as evidence of authenticated safety.
+local_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 6 http://127.0.0.1:18873/api/v1/session || true)"
+public_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 10 https://concat.scenebuilder.online/api/v1/session || true)"
+if [[ "$local_status" != "401" || "$public_status" != "401" ]]; then
+  rollback
+  fail "anonymous session API does not fail closed"
 fi
 echo "Concat-only release $SHA healthy; VPS_1 and nginx unchanged"
