@@ -77,7 +77,7 @@ class StudioTests(unittest.TestCase):
     def test_owner_specific_gpu_and_media(self):
         token = self.auth_csrf()
         self.assertEqual(self.client.post("/api/cloud-render/config", headers=token,
-            json={"endpoint": "https://alice-renderer.example", "priority": "low"}).status_code, 200)
+            json={"endpoint": "https://alice-renderer.salad.cloud", "priority": "low"}).status_code, 200)
         alice = get_registry(self.app).for_principal(Principal("alice"))
         mp4, sha = self.render_file(alice)
         self.assertEqual(self.client.get("/api/cloud-render/media/video-alice/file").content, mp4)
