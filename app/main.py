@@ -7,6 +7,7 @@ from pathlib import Path
 from app.auth import Principal, current_principal
 from app.config import load_settings
 from app.modules.dashboard.routes import router as dashboard_router
+from app.modules.dashboard.providers import ConcatDashboardProvider, UploaderDashboardProvider
 from app.modules.concat.routes import router as concat_router
 from app.modules.uploader.routes import router as uploader_router
 from app.modules.admin.routes import router as admin_router
@@ -15,7 +16,9 @@ def create_app():
     settings = load_settings()
     app = FastAPI(title=settings.app_name, version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.settings = settings
-    app.state.identity_resolver = None  # Agent 5 must install verified Scene-session identity
+    app.state.identity_resolver = None  # Production resolves only revocable Scene SSO; tests may inject fixtures.
+    app.state.concat_dashboard_provider = ConcatDashboardProvider(app)
+    app.state.uploader_dashboard_provider = UploaderDashboardProvider(app)
     app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
     app.include_router(dashboard_router)
     app.include_router(concat_router)
