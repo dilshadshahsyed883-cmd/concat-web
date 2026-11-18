@@ -11,7 +11,7 @@ from fastapi.responses import RedirectResponse
 from app.auth import Principal, current_principal
 from app.contracts.navigation import CONCAT, UPLOADER
 from app.ui import render_page
-from .gateway import resource_response, shutdown_backend
+from .gateway import backend_for, resource_response, shutdown_backend
 
 
 @asynccontextmanager
@@ -37,6 +37,8 @@ async def _page(request: Request, principal: Principal, slug: str, idx: int):
     # Once explicitly enabled, errors fail closed instead of serving a mock UI.
     if os.environ.get("CONCAT_UPLOADER_ENABLED") != "1":
         return render_page(request, principal, UPLOADER[idx])
+    # Never show a supposedly live workspace when the private backend fails closed.
+    await backend_for(request)
     return templates.TemplateResponse(
         request=request, name="workspace.html",
         context={"principal": principal, "page": UPLOADER[idx],
