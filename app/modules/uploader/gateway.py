@@ -27,12 +27,10 @@ REUSED_ROOT = Path(__file__).resolve().parents[3] / "reused" / "uploader" / "par
 
 # Make old unsafe/admin-only LUM endpoints unreachable even for Concat Web
 # admins. Admin is a separate administration surface; uploads remain owner-only.
-GET_EXACT = {"app", "oauth/google/callback", "actions/auth-connections/status"}
+GET_EXACT = {"app"}
 POST_EXACT = {
     "actions/add-video",
     "actions/oauth-client", "actions/oauth-start", "actions/oauth-complete",
-    "actions/google-oauth/connect",
-    "actions/auth-connections/test", "actions/auth-connections/activate",
     "actions/studio-tenant/channel-create", "actions/studio-tenant/group-create",
     "actions/sheets/save", "actions/sheets/delete",
     "actions/sheets/sync", "actions/sheets/sync-all",
