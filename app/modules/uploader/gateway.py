@@ -150,6 +150,7 @@ class UploaderResponse(Response):
     """Streams the child ASGI response, after server-side principal validation."""
 
     def __init__(self, backend, principal: Principal, path: str, query: bytes):
+        super().__init__(content=b"", status_code=200)
         self.backend = backend
         self.principal = principal
         self.path = path
