@@ -1,7 +1,8 @@
 # Concat Uploader — in-process, owner-scoped reuse
 
-This module mounts the real, copied VPS_1 Copyright Uploader (including PR
-#770) inside Concat Web, rather than drawing placeholder tabs. Only
+This module shows the real, copied VPS_1 Copyright Uploader (including PR
+#770) in a same-origin frame under the canonical Concat Web sidebar, rather
+than drawing placeholder tabs. Only
 \`/concat-uploader/**\` is exposed. Public entrypoints are Sheets Sync,
 Channels (Channel Manager / Accounts & Tokens), Upload Engine, and Queue.
 
@@ -13,7 +14,7 @@ username, role, or app-grant headers. The router verifies a current, active,
 Concat-granted Principal *before* any uploader import or request. The adapter
 then invokes the copied FastAPI app **in process**, forwarding the original
 request body and cookie while replacing authentication headers with the
-verified identity. Legacy administrative, Auto V6, setup and global settings
+verified identity. Legacy administrative, Auto V6, setup, global Web OAuth and global settings
 routes are not exposed, even for Concat Web administrators.
 
 The following deployment settings must be supplied by the integrator and
