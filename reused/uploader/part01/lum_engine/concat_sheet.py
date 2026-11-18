@@ -7,7 +7,7 @@ from __future__ import annotations
 from .concat_source import ConcatSourceError, parse_concat_link
 
 
-def preview_sheet_videos(rows, *, origin="https://app.scenebuilder.online", limit=250):
+def preview_sheet_videos(rows, *, origin="https://concat.scenebuilder.online", limit=250):
     result = []
     for number, row in enumerate(rows, start=2):
         if not isinstance(row, dict):
