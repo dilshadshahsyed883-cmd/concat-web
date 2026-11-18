@@ -96,7 +96,7 @@ class SecurityTests(unittest.TestCase):
         res = self.client.get("/auth/scene/start", params={"next": "https://attacker.test/"})
         self.assertEqual(res.status_code, 303)
         self.assertTrue(res.headers["location"].startswith(
-            self.scene_origin + "/internal/concat-sso/authorize?"))
+            self.scene_origin + "/concat-sso/authorize?"))
         self.assertIn("redirect_uri=https%3A%2F%2Fconcat.scenebuilder.online%2Fauth%2Fscene%2Fcallback",
                       res.headers["location"])
         self.assertNotIn("attacker.test", res.headers["location"])
