@@ -194,8 +194,8 @@
     <section class="lum-card">
       <div class="lum-card-head">
         <div>
-          <h2>1. Shared OAuth Client</h2>
-          <p>{% if engine_instance == "copyright" %}Configured once and reused across your own channels for new connections and reconnects. Each account manages its own client; other accounts and existing channel tokens remain unchanged.{% else %}Configured once and reused for every new or reconnected channel. Existing channel tokens remain independent.{% endif %}</p>
+          <h2>1. {{ "My OAuth Client" if engine_instance == "concat" else "Shared OAuth Client" }}</h2>
+          <p>{% if engine_instance in ["copyright","concat"] %}Configured once and reused across your own channels for new connections and reconnects. Each account manages its own client; other accounts and existing channel tokens remain unchanged.{% else %}Configured once and reused for every new or reconnected channel. Existing channel tokens remain independent.{% endif %}</p>
         </div>
         <span class="lum-badge {{ 'good' if clients else 'warn' }}">{{ 'READY' if clients else 'NOT CONFIGURED' }}</span>
       </div>
@@ -204,7 +204,7 @@
         <label class="lum-field lum-grow"><span>Google Desktop OAuth client JSON</span><input name="client_json" type="file" accept="application/json,.json" required></label>
         <button class="lum-button" type="submit">Set / Replace Shared Client</button>
       </form>
-      {% if clients %}<div class="lum-note">{% if engine_instance == "copyright" and clients[0].label == "my_oauth_client" %}My shared client (private to this account):{% elif engine_instance == "copyright" %}Available shared fallback client:{% else %}Shared client:{% endif %} <strong>{{ clients[0].filename }}</strong></div>{% else %}<div class="lum-note">Upload your OAuth client to connect channels. Existing valid channel tokens remain available.</div>{% endif %}
+      {% if clients %}<div class="lum-note">{% if engine_instance in ["copyright","concat"] and clients[0].label == "my_oauth_client" %}My shared client (private to this account):{% elif engine_instance in ["copyright","concat"] %}Available shared fallback client:{% else %}Shared client:{% endif %} <strong>{{ clients[0].filename }}</strong></div>{% else %}<div class="lum-note">Upload your OAuth client to connect channels. Existing valid channel tokens remain available.</div>{% endif %}
     </section>
 
     <section class="lum-card" data-lum-auth-section="verify">
