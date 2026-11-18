@@ -1,14 +1,17 @@
 """Concat Uploader: verified identity boundary and copied working ASGI backend."""
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi.templating import Jinja2Templates
 import os
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from app.auth import Principal, current_principal
-from app.contracts.navigation import UPLOADER
+from app.contracts.navigation import CONCAT, UPLOADER
 from app.ui import render_page
-from .gateway import page_response, resource_response, shutdown_backend
+from .gateway import resource_response, shutdown_backend
 
 
 @asynccontextmanager
@@ -20,6 +23,7 @@ async def _lifecycle(app):
 
 
 router = APIRouter(prefix="/concat-uploader", lifespan=_lifecycle)
+templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
 @router.get("")
@@ -33,7 +37,14 @@ async def _page(request: Request, principal: Principal, slug: str, idx: int):
     # Once explicitly enabled, errors fail closed instead of serving a mock UI.
     if os.environ.get("CONCAT_UPLOADER_ENABLED") != "1":
         return render_page(request, principal, UPLOADER[idx])
-    return await page_response(request, principal, slug)
+    return templates.TemplateResponse(
+        request=request, name="workspace.html",
+        context={"principal": principal, "page": UPLOADER[idx],
+                 "concat_pages": CONCAT, "uploader_pages": UPLOADER,
+                 "tab": {"sheets-sync": "sheets", "channels": "channels",
+                         "upload-engine": "add_video", "queue": "queue"}[slug]},
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
 
 
 @router.get("/sheets-sync")
