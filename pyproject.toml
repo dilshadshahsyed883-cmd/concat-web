@@ -7,7 +7,7 @@ name = "concat-web"
 version = "0.1.0"
 description = "Independent Concat Web application, reusing VPS_1 source"
 requires-python = ">=3.11"
-dependencies = ["fastapi==0.115.12", "uvicorn==0.34.2", "jinja2==3.1.6"]
+dependencies = ["fastapi==0.115.12", "uvicorn==0.34.2", "jinja2==3.1.6", "requests==2.32.3"]
 
 [project.optional-dependencies]
 test = ["httpx==0.28.1"]
@@ -16,4 +16,4 @@ test = ["httpx==0.28.1"]
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["templates/*.html", "static/*.css", "static/*.js"]
+app = ["templates/*.html", "static/*.css", "static/*.js", "modules/concat/templates/*.html", "modules/concat/assets/*.css", "modules/concat/assets/*.js"]
