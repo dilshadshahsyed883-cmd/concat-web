@@ -19,7 +19,7 @@ class Principal:
 
     def valid(self) -> bool:
         from app.modules.admin.security import _valid_username
-        return _valid_username(self.username)
+        return _valid_username(self.username) and self.username.casefold() != "__default__"
 
 
 IdentityResolver = Callable[[Request], Union[Optional[Principal], Awaitable[Optional[Principal]]]]
