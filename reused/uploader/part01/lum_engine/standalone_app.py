@@ -670,14 +670,14 @@ def app_page(request: Request, tab: str = "", message: str = "", error: str = ""
             studio_tenants.require("sheet", int(selected_sheet_source["id"]), user)
             raw = tenant_fetch_sheet_csv(selected_sheet_source["sheet_url_or_id"], None)
             concat_sheet_videos = preview_sheet_videos(
-                raw, origin=os.getenv("CONCAT_PUBLIC_ORIGIN", "https://app.scenebuilder.online"))
+                raw, origin=os.getenv("CONCAT_PUBLIC_ORIGIN", "https://concat.scenebuilder.online"))
         except Exception:
             concat_sheet_error = "Sheet preview is unavailable; check access and retry Sync"
     concat_source_prefill = ""
     if engine_instance == "concat" and selected == "add_video" and concat_video_link:
         try:
             parse_concat_link(concat_video_link,
-                              origin=os.getenv("CONCAT_PUBLIC_ORIGIN", "https://app.scenebuilder.online"))
+                              origin=os.getenv("CONCAT_PUBLIC_ORIGIN", "https://concat.scenebuilder.online"))
             concat_source_prefill = concat_video_link
         except ConcatSourceError:
             pass
@@ -928,7 +928,7 @@ async def add_video(
                 owned_staging, source_original, source_size, fingerprint = stage_concat_link(
                     concat_video_link, str(user["username"]), STAGING_ROOT,
                     cloud_root=Path(cloud_root),
-                    origin=os.getenv("CONCAT_PUBLIC_ORIGIN", "https://app.scenebuilder.online"),
+                    origin=os.getenv("CONCAT_PUBLIC_ORIGIN", "https://concat.scenebuilder.online"),
                 )
             elif source_mode == "drive_link":
                 if not drive_url.strip():
