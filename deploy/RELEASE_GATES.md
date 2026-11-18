@@ -10,4 +10,4 @@
 8. Snapshot independent release and persistent state (consistent SQLite backup where appropriate). Keep previous working service and Nginx config.
 9. Deploy only from reviewed protected main with explicit approval, SHA pinning, serial lock and host-installed Drive Bridge guarded process. Never deploy from feature branches.
 10. Post-activation: check /healthz, authenticated HTML, owner isolation, Nginx -t and existing app.scenebuilder.online. On failure roll back only concat-web unit/release/route. Preserve data.
-This repository phase intentionally contains only inert templates and a dispatchable preflight gate; no server access or production deployment actions.
+Integration now contains copied working modules, owner-specific runtime adapters and offline smoke tests. Production remains unauthorized; upstream Scene SSO issuer #772 and real external-service acceptance are documented in docs/FINAL_INTEGRATION_BLOCKERS_20261118.md. Do not treat isolated tests as live SSO/Salad/YouTube acceptance.
