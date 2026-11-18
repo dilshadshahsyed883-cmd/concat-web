@@ -137,7 +137,7 @@ class SecurityTests(unittest.TestCase):
         ticket = self.sign_ticket()
         state = self.client.cookies.get(STATE_COOKIE)
         bad = [
-            (ticket[:-1] + ("x" if ticket[-1] != "x" else "y"), state),
+            ( ("A" if ticket[0] != "A" else "B") + ticket[1:], state),
             (self.sign_ticket(aud="unrelated"), state),
             (self.sign_ticket(exp=int(time.time()) - 1), state),
             (self.sign_ticket(sid=secrets.token_urlsafe(35)), state),
@@ -149,7 +149,9 @@ class SecurityTests(unittest.TestCase):
                                  params={"ticket": t, "state": s}).status_code, 401)
         first = self.client.get("/auth/scene/callback", params={"ticket": ticket, "state": state})
         self.assertEqual(first.status_code, 303)
-        self.start_sso()
+        # Restore the original nonce in the local test browser: the signed JTI
+        # must remain rejected even with a matching CSRF state cookie.
+        self.client.cookies.set(STATE_COOKIE, state, path="/", secure=True)
         self.assertEqual(self.client.get("/auth/scene/callback",
                          params={"ticket": ticket, "state": state}).status_code, 401)
 
