@@ -117,6 +117,16 @@ print("PASS Concat owner queue, persisted pause, dedup, admin parity")
         with tempfile.TemporaryDirectory() as root:
             path = Path(root) / "concat-only"
             env = os.environ.copy()
+            # Other imported upstream modules may set these process-global defaults.
+            # An isolated subprocess must not inherit their previous data roots.
+            # Keep the production Concat storage guard intact; test its clean
+            # canonical data-root configuration instead.
+            for stale in (
+                "YOUTUBE_UPLOAD_MANAGER_DATA_DIR",
+                "LUM_GOOGLE_OAUTH_ROOT",
+                "LUM_AUTO_ENGINE_V6_ROOT",
+            ):
+                env.pop(stale, None)
             env.update({
                 "LUM_ENGINE_INSTANCE": "concat",
                 "LUM_DATA_DIR": str(path),
