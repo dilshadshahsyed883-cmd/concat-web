@@ -35,7 +35,7 @@ async def scene_login(request: Request, next: str = "/dashboard"):
         "redirect_uri": service.web_origin + "/auth/scene/callback",
     })
     response = RedirectResponse(
-        service.scene_origin + "/internal/concat-sso/authorize?" + params,
+        service.scene_origin + "/concat-sso/authorize?" + params,
         status_code=303, headers=PRIVATE,
     )
     response.set_cookie(STATE_COOKIE, state, max_age=180, secure=True,
