@@ -138,7 +138,7 @@ class ConcatSheetLinkTests(unittest.TestCase):
             {"concat_video_link": "https://evil.example/video.mp4", "title": "Bad"},
             {"video_link": LINK.replace(VIDEO_ID, "otherjob"), "video_title": "Video B"},
         ]
-        preview = preview_sheet_videos(rows)
+        preview = preview_sheet_videos(rows, origin="https://concat.scenebuilder.online")
         self.assertEqual(len(preview), 2)
         self.assertEqual(preview[0]["title"], "Video A")
         self.assertEqual(preview[1]["title"], "Video B")
