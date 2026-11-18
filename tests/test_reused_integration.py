@@ -80,7 +80,7 @@ class FinalIntegration(unittest.TestCase):
                 (remote_id,drive_id,name,resource_keys,drive_size,
                  drive_md5,folder_id,drive_path,state)
                 VALUES (?,?,?,?,?,?,?,?,?)""",
-                (VIDEO_ID, "drive-render-a", "project.zip", "", len(MP4),
+                (VIDEO_ID, "drive-render-a", "render.zip", "", len(MP4),
                  "", "", "", "Completed"))
         digest = hashlib.sha256(MP4).hexdigest()
         reply = self.client.post(
