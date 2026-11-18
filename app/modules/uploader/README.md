@@ -8,8 +8,7 @@ Channels (Channel Manager / Accounts & Tokens), Upload Engine, and Queue.
 
 ## Fail-closed bootstrap
 
-Agent 5 installs the **verified** Scene-session resolver on
-\`app.state.identity_resolver\`. This module never accepts client-supplied
+The integrated app uses revocable Scene SSO from the Admin module. Only isolated tests inject verified fixture Principals. This module never accepts client-supplied
 username, role, or app-grant headers. The router verifies a current, active,
 Concat-granted Principal *before* any uploader import or request. The adapter
 then invokes the copied FastAPI app **in process**, forwarding the original
@@ -23,10 +22,8 @@ cannot be committed as credentials:
 - \`CONCAT_UPLOADER_ENABLED=1\`
 - \`LUM_DATA_DIR=/var/lib/concat-web/uploader\` (dedicated, persistent, private)
 - \`LUM_SESSION_SECRET=<independently-generated-at-least-32-char-secret>\`
-- \`CONCAT_CLOUD_RENDER_ROOT=<path-to-owner-verified-cloud-render-data>\`
-- \`CONCAT_PUBLIC_ORIGIN=https://app.scenebuilder.online\` for legacy Copy
-  Video Links, or the verified Concat Web origin when its own Media IDs are
-  implemented.
+- CONCAT_CLOUD_RENDER_ROOT=/var/lib/concat-web (parent of owners/<sha256(canonical-username)>/)
+- CONCAT_PUBLIC_ORIGIN=https://concat.scenebuilder.online (new application's Copy Video Links)
 
 The adapter enforces \`LUM_ENGINE_INSTANCE=concat\`,
 \`LUM_BASE_PATH=/concat-uploader\`, \`LUM_SUITE_AUTH=1\`,
@@ -34,12 +31,10 @@ The adapter enforces \`LUM_ENGINE_INSTANCE=concat\`,
 rejected; OAuth, worker, staging, queues and SQLite remain in the dedicated
 \`LUM_DATA_DIR\`. Do not point these paths at Song or Copyright Uploader.
 
-Install copied uploader's actual Python dependencies in the deployment image
-as well as Concat Web's dependencies:
+The integrated pyproject installs compatible uploader dependencies. Verify with:
 
 \`\`\`sh
 python -m pip install -e '.[test]'
-python -m pip install -r reused/uploader/part01/requirements.txt
 python -m unittest discover -s app/modules/uploader/tests -p 'test_*.py' -v
 \`\`\`
 
@@ -48,8 +43,4 @@ initialization. ASGI shutdown stops the worker. Queues start paused and require
 manual Start Queue, even after a restart; YouTube uploads preserve resumability,
 verified cleanup, owner+channel duplicate detection and per-channel OAuth.
 
-**Integration gates remain:** Agent 2 must provide an owner-attributed Cloud
-Render \`files.owner_username\` schema and verified local MP4 handoff. Ownerless
-legacy rows and arbitrary HTTP URLs are denied. Agent 5 must provide verified
-session resolution and CSRF/revocation assurance. No live YouTube upload or
-production connection is tested by this feature PR.
+**Integrated media contract:** The new Concat Web database is isolated by a verified owner SHA-256 directory, so the original files schema has no owner_username. The handoff validates the exact owner directory and checks the MP4 SHA before private staging. Legacy single-DB sources still require matching non-null owner_username. Upstream Scene SSO issue #772 and real OAuth/Salad/YouTube acceptance remain release blockers.
