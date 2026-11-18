@@ -43,15 +43,24 @@ def parse_concat_link(link: str, *, origin: str = "https://app.scenebuilder.onli
     return match.group(1)
 
 
-def _owned_verified_file(con: sqlite3.Connection, job: str, owner: str) -> dict:
+def _owned_verified_file(con: sqlite3.Connection, job: str, owner: str, *, verified_tenant: bool = False) -> dict:
     columns = {str(row[1]) for row in con.execute("PRAGMA table_info(files)")}
     if "owner_username" not in columns:
-        raise ConcatSourceError("Cloud Render per-user isolation is not enabled yet")
-    row = con.execute(
-        "SELECT id,name,size,sha256,state,owner_username FROM files WHERE id=?", (job,)
-    ).fetchone()
-    if (not row or not row["owner_username"]
-            or str(row["owner_username"]).strip().casefold() != str(owner).strip().casefold()):
+        if not verified_tenant:
+            raise ConcatSourceError("Cloud Render per-user isolation is not enabled yet")
+        # Only reachable inside the verified Concat Web owner hash directory,
+        # never in a legacy/global Cloud Render database.
+        row = con.execute(
+            "SELECT id,name,size,sha256,state FROM files WHERE id=?", (job,)
+        ).fetchone()
+    else:
+        row = con.execute(
+            "SELECT id,name,size,sha256,state,owner_username FROM files WHERE id=?", (job,)
+        ).fetchone()
+        if (not row or not row["owner_username"]
+                or str(row["owner_username"]).strip().casefold() != str(owner).strip().casefold()):
+            raise ConcatSourceError("Video is unavailable in this account")
+    if not row:
         raise ConcatSourceError("Video is unavailable in this account")
     info = dict(row)
     if (info["state"] != "ready" or not 0 < int(info["size"]) <= MAX_MP4
@@ -77,13 +86,25 @@ def stage_concat_link(link: str, owner: str, staging_root: Path, *,
     if (not root.is_absolute() or root.is_symlink() or
             not destination_root.is_absolute() or destination_root.is_symlink()):
         raise ConcatSourceError("Verified storage configuration is unavailable")
+    verified_tenant = os.getenv("CONCAT_WEB_IN_PROCESS") == "1"
+    if verified_tenant:
+        # Concat Studio stores each verified owner in a separate database.
+        # The directory key is derived *only* from the authenticated backend
+        # identity, not the copied link, a query parameter, or any URL path.
+        owners = root / "owners"
+        key = hashlib.sha256(str(owner).encode("utf-8")).hexdigest()
+        tenant = owners / key
+        if (owners.is_symlink() or not owners.is_dir() or
+                tenant.is_symlink() or not tenant.is_dir()):
+            raise ConcatSourceError("Verified owner media is unavailable")
+        root = tenant
     database = root / "cloud_render.sqlite3"
     media_root = root / "media"
     if not database.is_file() or database.is_symlink() or not media_root.is_dir() or media_root.is_symlink():
         raise ConcatSourceError("Cloud Render verified storage is unavailable")
     with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as con:
         con.row_factory = sqlite3.Row
-        info = _owned_verified_file(con, job, owner)
+        info = _owned_verified_file(con, job, owner, verified_tenant=verified_tenant)
     source = media_root / f"{job}.mp4"
     if (not source.is_file() or source.is_symlink()
             or source.resolve().parent != media_root.resolve()):
