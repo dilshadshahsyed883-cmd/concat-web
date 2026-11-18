@@ -9,7 +9,7 @@ Target PR: main (NO MERGE, NO DEPLOY)
 - Exact source integration of verified PRs #3 Uploader, #4 Concat Studio, #5 Dashboard, #6 Admin/SSO, preserving original engine and UI rather than rebuilding.
 - Main ASGI app registers production dashboard data adapters (real Cloud Render owner DB and copied uploader owner-specific SQLite queue, both read-only).
 - Verified Concat Web Copy Video Link uses only SHA-verified ready owner MP4s from the per-owner directory; copied uploader stages private bytes and retains queue duplicate prevention.
-- Source admission keeps the original legacy single-database owner_username predicate; ownerless global records are rejected, never auto-attributed.
+- Source admission is restricted to the canonical hashed owner directory; every legacy global single-database source is quarantined, including rows carrying an old owner_username claim. No automatic migration or fallback.
 - Dependency pins and copied uploader source/assets included in wheel configuration; minimal existing CI workflows retained.
 - Offline integration fixture simulates the Salad receiver's output and verifies checksum/source handoff, queue persistence, owner-specific dashboard, rejected foreign owners, forged session headers, CSRF and legacy quarantine.
 - No changes to Scene/VPS_1 repository, production database, deployed web routes, OAuth, Drive Bridge, Salad image or release artifacts.
