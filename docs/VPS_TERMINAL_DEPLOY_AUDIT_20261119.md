@@ -228,3 +228,40 @@ This **confirms** restrictive staged directory modes `0700`, not an absent Pytho
 4. Validate independent service health, private state, backups/rollback and exact SHA; check existing app health after guarded cutover. Leave automated deployment OFF. **No deploy, merge, upstream modification, secret generation or VPS action is performed in this PR update.**
 
 **Status at this decision:** design approved for faster deployment; **code migration, testing and actual deployment remain outstanding**. This PR remains a traceable deployment audit/decision record. Do not mark the SSO-bound current implementation production-ready merely because the intended future architecture has changed.
+
+
+## Architecture decision superseding Scene SSO — 2026-11-19
+
+The owner explicitly approved **permanently replacing Scene SSO** with
+**standalone single-admin Concat authentication** to deploy the already completed
+Concat Web independently. The earlier Scene-issuer dependency and upstream
+VPS1 PR #774 are **no longer Concat Web release blockers**. Do not touch
+LUT, GPU engine, worker, Scene app, or other VPS1 services for this change.
+
+**Separate coding PR**: https://github.com/dilshadshahsyed883-cmd/concat-web/pull/13
+`feature/standalone-admin-terminal-release-20261119` against `concat-web/main`.
+
+Implemented in draft PR #13:
+- Native username/password login using stdlib scrypt password hash, persistent
+  local session hashes, secure `__Host-` cookie, anti-CSRF, throttling,
+  logout and revocation. No SSO callback/ticket/Scene DB path.
+- Independent admin settings; owner-bound Cloud Render, dashboard and uploader
+  reused without cross-user/ownerless fallback.
+- Local-only environment/host preflight, secure root-only first-run admin
+  provisioning, and removal of SSH/Tailscale/auto-deploy from GitHub workflow.
+- Uploader core path conflict uncovered by integration CI: copied core must be
+  bound to Concat private `LUM_DATA_DIR/core` and OAuth/vault roots, **not**
+  `/var/lib/local-upload-manager`. A fail-closed path guard was added.
+- Tests cover login, owner isolation, CSRF, session revocation and simulated
+  GPU receiver -> verified MP4 -> persistent queue -> dashboard; separate
+  clean-process test covers the uploader UI and private path binding.
+
+At commit `90622fd5a0f84a45085170e3eb5d82cac00596c5`,
+GitHub Admin security checks and essential checks both completed successfully.
+No merge or VPS deployment is part of these PR changes; live Salad GPU,
+Google OAuth/YouTube and public TLS acceptance remain for controlled staging
+after the approved merge/manual terminal release.
+
+**Current project policy:** GitHub-first code, feature branch/PR, review and
+tests, then verified protected `main` SHA manually deployed from VPS terminal
+with backup and rollback. Automatic GitHub Actions production deployments OFF.
