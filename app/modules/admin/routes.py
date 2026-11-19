@@ -138,7 +138,7 @@ async def logout(request: Request, _: Principal = Depends(current_principal)):
 async def admin(request: Request, principal: Principal = Depends(admin_principal)):
     return templates.TemplateResponse(
         request=request, name="admin.html",
-        context={"principal": principal, "local_mode": getattr(get_security(request), "is_local", False)}, headers=PRIVATE,
+        context={"principal": principal, "local_mode": os.environ.get("CONCAT_AUTH_MODE", "scene").strip() == "local"}, headers=PRIVATE,
     )
 
 
