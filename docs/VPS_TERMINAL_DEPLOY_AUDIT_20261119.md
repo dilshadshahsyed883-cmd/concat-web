@@ -204,3 +204,27 @@ This **confirms** restrictive staged directory modes `0700`, not an absent Pytho
 - Not yet proven CI-passing or deployed: **do not retry the old SHA or manually chmod the VPS release**. Validate upstream PR tests and reviewed merge, then perform a **new SHA-pinned** guarded Scene deployment with preflight and rollback. Recheck Scene issuer and `concat_sso_sessions` before Concat's own installation.
 
 `concat-web/main` and VPS production were **not modified** by the GitHub code changes recorded here.
+
+
+---
+
+## Deployment direction superseded: personal single-admin fast path — 2026-11-19
+
+**User decision:** Concat Web is a **personal-use application**. For the initial Concat release, do **not** require the VPS_1 Scene SSO issuer, its database, its cross-app signing secret, or multi-user provisioning. This decision **supersedes the SSO-dependent future release recommendations above**; the historical terminal/audit findings remain preserved as evidence. **It does not assert that the code already implements the new auth path.**
+
+### Approved architecture for the next Concat release
+
+- One independently authenticated **local administrator** for Concat Web, provisioned explicitly in the app's root-owned private environment/state. No public signup and no default/demo password. Do not trust identity headers or use a static hard-coded/bearer-token bypass. Use a salted, slow password hash, authenticated revocable sessions, secure HttpOnly SameSite cookies, CSRF protection for state changes, strict HTTPS/origin checks, rate-limited login attempts and logout/session revocation. Do not print/store passwords or signing secrets in GitHub or chat.
+- Retain Concat's current owner-scoped media/job/queue isolation predicates and deny unknown/ownerless legacy records. For this first release only, one configured administrator is sufficient; do not build a new multi-user authorization or account management system. All Concat operations should resolve to the configured owner, not to an unverified request parameter.
+- **No new VPS_1 Scene deployment, SSO issuer/schema/secret coordination or changes to the upstream Scene app are required for this new target.** The prior VPS_1 staging-permission/LUT failure and upstream PR #774 are historical findings, not Concat personal-mode prerequisites. Do not undo any prior approved VPS1 configuration; simply avoid further coupling.
+- Keep Concat a separate Linux user, state store, loopback service and Nginx hostname (`concat.scenebuilder.online`). Preserve existing VPS_1 production/other Nginx routes, Salad GPU, OAuth/channel data, verified MP4 handoff and canonical Drive Bridge access rules. No data migration or cross-owner mixing.
+- **GitHub-first development, manual VPS terminal release only:** commit/test changes in `concat-web`, review the exact protected `main` SHA, take independent backup, run guarded Concat-only preflight, stage/start Concat on loopback, verify health and denied unauthenticated endpoints, then perform a separately guarded HTTPS/Nginx cutover with rollback. Do not use GitHub Actions to deploy. No merge/cutover is authorized by this documentation decision alone.
+
+### Required code work before deployment (not completed by this docs-only PR)
+
+1. Implement/test independent local-admin authentication and session/CSRF handling in `app/modules/admin/security.py`, `app/modules/admin/routes.py` and `app/auth.py`. Replace the Scene login/callback URLs with a Concat-local login page/flow. Preserve fail-closed behavior until setup is valid; remove Scene reads only in the **new** explicit personal-mode path, not via blanket auth bypass. Keep the owner principal stable and the API contract for dashboard/Concat/Uploader intact.
+2. Update `.env.example`, `deploy/guarded-release.sh` and `deploy/RELEASE_GATES.md` to verify a strong private local-login setup instead of the live Scene DB/SSO issuer. The **currently committed deployment helper still requires Scene SSO** and therefore cannot deploy this new mode yet. Also verify the installed host helper matches the revised reviewed code before using it.
+3. Update/extend focused tests for successful local login and denial of anonymous access, malformed credentials, login brute force, session expiry/revocation, CSRF and cross-owner/legacy access. Confirm the existing uploader auth handoff and active Cloud Render→verified MP4→Uploader workflow, not only an HTML page load.
+4. Validate independent service health, private state, backups/rollback and exact SHA; check existing app health after guarded cutover. Leave automated deployment OFF. **No deploy, merge, upstream modification, secret generation or VPS action is performed in this PR update.**
+
+**Status at this decision:** design approved for faster deployment; **code migration, testing and actual deployment remain outstanding**. This PR remains a traceable deployment audit/decision record. Do not mark the SSO-bound current implementation production-ready merely because the intended future architecture has changed.
