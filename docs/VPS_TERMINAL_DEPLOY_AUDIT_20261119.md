@@ -171,3 +171,36 @@ SH
 ```
 
 **Do not** apply arbitrary `chmod -R` to production trees, pip-install `smart_scroll` from PyPI, inject `sys.path`, skip LUT proof, restart services or retry the release blindly. If permissions are confirmed, fix the immutable source staging permissions **in the VPS1 source repository with tests and a separate PR**, then use the normal guarded release after CI. Keep this Concat-Web PR as the cross-app audit record.
+
+
+## Confirmed root cause and upstream fix PR — 2026-11-19
+
+Operator executed the restricted read-only inspection against failed candidate SHA `6a34d5a34f3974dea0c4a3f919c3ae5fe9b2e53d`:
+
+```text
+MODULE_FILE=EXISTS
+# namei -l reported:
+drwx------ root root 6a34d5a34f3974dea0c4a3f919c3ae5fe9b2e53d
+drwx------ root root part02
+drwx------ root root smart_scroll
+-rw-r--r-- root root lut_engine.py
+WORKER_READ=FAIL
+ModuleNotFoundError: No module named 'smart_scroll'
+IMPORT=FAIL
+SCENE_CANDIDATE_SERVICE=active
+CURRENT_SCENE_RELEASE=/srv/fresh-website/releases/scene-builder/9379c166026794994a64ffaffe4efaf3812c02ed
+HEALTH=200
+CHANGES=NONE
+```
+
+This **confirms** restrictive staged directory modes `0700`, not an absent Python file, caused the worker import failure. Scene candidate stayed on the prior healthy release. The pre-release SSO secret was written into Scene's root-owned private environment with a backup; the attempted source release failed before the observed promotion.
+
+**Working code fix (separate upstream repository and draft PR):**
+- VPS1 repository: `dilshadshahsyed883-cmd/vps1-deploy-control`
+- Branch: `fix/scene-stage-traversal-permissions-20261119`
+- Draft PR: https://github.com/dilshadshahsyed883-cmd/vps1-deploy-control/pull/774
+- Change: explicit staged directory `0755` modes after immutable manifest verification on both fresh and re-entered staging; reject symlinks; retain `0644` source files.
+- Regression tests target restrictive `umask 077`, repeated stage verification and symlink refusal.
+- Not yet proven CI-passing or deployed: **do not retry the old SHA or manually chmod the VPS release**. Validate upstream PR tests and reviewed merge, then perform a **new SHA-pinned** guarded Scene deployment with preflight and rollback. Recheck Scene issuer and `concat_sso_sessions` before Concat's own installation.
+
+`concat-web/main` and VPS production were **not modified** by the GitHub code changes recorded here.
