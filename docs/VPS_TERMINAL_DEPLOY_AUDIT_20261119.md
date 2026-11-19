@@ -93,3 +93,29 @@ VPS_CHANGES=NONE
 - The Ubuntu restart/upgrade banner is unrelated to this verification; don't reboot/upgrade as part of this work.
 
 This finding **supersedes the earlier guessed DB path** and clarifies why the scan of 12 transaction backup databases was not diagnostic of the live issuer.
+
+
+## Subsequent Scene release-readiness audit — 2026-11-19
+
+The operator ran a second **read-only** check of the active Scene candidate and its existing release/deploy helper. Output:
+
+```text
+CURRENT_RELEASE=/srv/fresh-website/releases/scene-builder/9379c166026794994a64ffaffe4efaf3812c02ed
+VPS1_DEPLOY_HELPER=READY
+SCENE_SSO_SECRET_IN_ENV_FILE=MISSING
+SCENE_HEALTH_HTTP=200
+SCENE_WORKER=active
+CHANGES=NONE
+```
+
+Interpretation:
+- Scene is serving its current release and responding to `http://127.0.0.1:18080/health` with HTTP 200; the production Scene worker is active.
+- The existing VPS1 production deploy helper `/usr/local/sbin/vps1-production-deploy` is executable, but this **does not authorize invoking it for an unverified release**.
+- The tested file `/etc/fresh-website/scene-builder.env` does not contain a line matching `^CONCAT_SCENE_SSO_SECRET=.{32,}$` (or that file is absent). This is a **file-specific** result: it does not establish whether the secret is provisioned through another unit environment source or secret manager. Never print the secret's value.
+- In the immediately preceding runtime audit, the active candidate code lacked `concat_sso_issuer.py` and the authoritative live DB lacked `concat_sso_sessions`. Those remain blockers despite HTTP 200.
+
+### Next guarded action
+
+Verify the correct active Scene service configuration and approved secret provisioning path **without exposing environment values**. Confirm the upstream issuer release was tested and approved independently in `vps1-deploy-control`; use only the established VPS1 guarded deployment/rollback process, never manual SQL migration or bypass. After the authorized upstream rollout, recheck the issuer file, SSO table, live session revocation, and Concat user read-only DB access. Only then proceed with Concat's private env, strict preflight and loopback deployment.
+
+**Do not modify Scene services, perform an Ubuntu upgrade/reboot, start Concat, or open public Concat ingress based on these read-only audits alone.**
