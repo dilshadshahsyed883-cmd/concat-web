@@ -64,3 +64,32 @@ The VPS login banner reported pending package/security updates, Ubuntu 26.04.1 L
 6. Verify Concat-only /healthz, denial of anonymous private routes, two-owner/admin SSO and revocation, and a controlled GPU-to-verified-MP4-to-uploader acceptance test. Preserve independent rollback and prior releases.
 
 **Current state:** bootstrap complete; no Concat release or public activation; live SSO DB path unresolved; private environment unprovisioned; existing VPS1 production preserved as far as operator-reported steps show.
+
+
+## New finding: authoritative Scene candidate runtime (read-only)
+
+User-supplied VPS terminal probe inspected the active `vps1-scene-candidate.service` unit and the runtime's effective `WEB_DATA_DIR` (without printing credentials). It reported:
+
+```text
+SCENE_PID_RUNNING= True
+SCENE_APP_PATH= /srv/fresh-website/current/scene-builder/part01
+SSO_ISSUER_FILE= False
+SCENE_DB_PATH= /var/lib/fresh-website/scene-builder/web/web.sqlite3
+SCENE_DB_EXISTS= True
+USERS_TABLE= True
+CONCAT_SSO_TABLE= False
+VPS_CHANGES=NONE
+```
+
+**Correct live Scene DB:** `/var/lib/fresh-website/scene-builder/web/web.sqlite3`.  
+**Important blocker:** the currently running candidate code tree does not contain `concat_sso_issuer.py`, and this live database has no `concat_sso_sessions` table. Hence the Scene issuer integration is **not deployed/initialized in the inspected candidate**. Upstream VPS1 SSO issuer PR #773 is merged in source, but a source merge is not proof of live service deployment. No safe route exists to bypass this blocker in Concat Web.
+
+### Impact and next steps
+
+- **Do not start or expose Concat Web yet;** login must remain fail-closed.
+- Resolve the upstream SSO release through the **VPS1 repository's separate controlled deployment** after verifying it is ready. Preserve VPS1 production; do not copy issuer Python modules into the live host manually, run schema-changing SQL manually, or turn off SSO/security gates.
+- Once upstream is live, confirm that `concat_sso_issuer.py` is present in the active code release and the authoritative Scene DB contains `concat_sso_sessions`. Then confirm schema and read-only SQLite WAL access from `concatweb`.
+- Provision the private Concat environment only after aligning the approved cross-app signing secret, runtime path, and isolated settings. Run Concat preflight (without deployment) before any loopback release.
+- The Ubuntu restart/upgrade banner is unrelated to this verification; don't reboot/upgrade as part of this work.
+
+This finding **supersedes the earlier guessed DB path** and clarifies why the scan of 12 transaction backup databases was not diagnostic of the live issuer.
