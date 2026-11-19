@@ -47,7 +47,7 @@
   window.matchMedia("(max-width: 900px)").addEventListener("change", event => {
     if (!event.matches) close();
   });
-}
+
   const signOut = document.getElementById("nav-logout");
   if (signOut) {
     signOut.addEventListener("click", async () => {
