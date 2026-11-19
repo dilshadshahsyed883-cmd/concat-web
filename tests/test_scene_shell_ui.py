@@ -157,10 +157,18 @@ class SceneShellUXTests(unittest.TestCase):
                     for href in ("/concat/production", "/concat/media",
                                  "/concat/gpu-config", "/concat-uploader/sheets-sync"):
                         self.assertIn('href="' + href + '"', page)
-                    self.assertIn('src="/concat-uploader/app?tab=' + child + '"', page)
-                    # The copied Uploader already renders its four nested tabs
-                    # inside the iframe; do not duplicate them outside.
-                    self.assertNotIn('class="uploader-tabs"', page)
+                    # Without CONCAT_UPLOADER_ENABLED, the fail-closed fallback
+                    # renders the nested links itself instead of a live iframe.
+                    self.assertIn('class="uploader-tabs"', page)
+                    self.assertIn('href="/concat-uploader/' + slug +
+                                  '" class="active" aria-current="page"', page)
+                    self.assertNotIn('class="uploader-frame"', page)
+
+        # When enabled, the real Uploader template embeds the working app.
+        # Its one native tab rail remains inside the iframe (not duplicated).
+        live = (ROOT / "app/modules/uploader/templates/workspace.html").read_text()
+        self.assertIn('src="/concat-uploader/app?tab={{ tab | urlencode }}"', live)
+        self.assertNotIn('class="uploader-tabs"', live)
 
         copied = (ROOT / "reused/uploader/part01/templates/app.html").read_text()
         self.assertIn("engine_instance == 'concat'", copied)
