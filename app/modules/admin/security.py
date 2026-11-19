@@ -126,6 +126,12 @@ class SecurityService:
 
     @classmethod
     def from_environment(cls, app) -> "SecurityService":
+        mode = os.environ.get("CONCAT_AUTH_MODE", "scene").strip()
+        if mode == "local":
+            from app.modules.admin.local_security import LocalAdminSecurity
+            return LocalAdminSecurity.from_environment(app)
+        if mode != "scene":
+            raise SecurityUnavailable("Unsupported authentication mode")
         scene = os.environ.get("CONCAT_SCENE_USERS_DB", "").strip()
         local = os.environ.get("CONCAT_WEB_SECURITY_DB", "").strip()
         secret = os.environ.get("CONCAT_SCENE_SSO_SECRET", "")
@@ -430,7 +436,7 @@ def get_security(request: Request) -> SecurityService:
         try:
             cached = SecurityService.from_environment(request.app)
         except SecurityUnavailable as exc:
-            raise HTTPException(503, "Verified Scene SSO not configured") from exc
+            raise HTTPException(503, "Concat authentication not configured") from exc
         request.app.state.concat_security = cached
     return cached
 

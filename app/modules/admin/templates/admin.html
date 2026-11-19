@@ -41,18 +41,18 @@ th,td{padding:10px 12px;border-bottom:1px solid #30405b}
 </nav><main id="content" class="content" tabindex="-1">
 <div class="eyebrow">Concat Web / Admin</div>
 <h1>Admin &amp; Security</h1>
-<p class="lead">Scene owns user accounts and admin roles. This panel manages Concat access, session revocation and non-secret system settings. Admin render and upload data remains owner-scoped.</p>
+<p class="lead">{% if local_mode %}Personal administrator workspace. Authentication and sessions belong only to Concat Web; media and uploads stay owner-scoped.{% else %}Scene owns user accounts and admin roles. This panel manages Concat access, session revocation and non-secret system settings. Admin render and upload data remains owner-scoped.{% endif %}</p>
 <div class="panel">
 <p role="status" class="status" id="status">Loading verified settings…</p>
-<section class="panel-card"><h2>Users &amp; access</h2>
-<p class="muted">A Concat access grant does not grant access to another user's media, channels, queues or credentials. Scene account changes must be made in Scene.</p>
+<section class="panel-card"><h2>{% if local_mode %}Local administrator{% else %}Users &amp; access{% endif %}</h2>
+<p class="muted">{% if local_mode %}Only the configured administrator can sign in. Access grants are disabled; sessions can still be revoked.{% else %}A Concat access grant does not grant access to another user's media, channels, queues or credentials. Scene account changes must be made in Scene.{% endif %}</p>
 <div class="scroll-table"><table><thead><tr><th>User</th><th>Scene status</th><th>Role</th><th>Concat access</th><th>Sessions</th></tr></thead>
 <tbody id="users"><tr><td colspan="5">Loading…</td></tr></tbody></table></div></section>
 <section class="panel-card"><h2>System configuration</h2>
 <div class="controls"><label><input type="checkbox" id="maintenance"> Maintenance mode (non-admin access disabled)</label>
 <label>Max session minutes <input type="number" min="15" max="480" id="max-session" value="480"></label>
 <button id="save-config" type="button">Save settings</button></div>
-<p class="muted">Signing keys, Scene database paths, GPU service credentials and OAuth tokens are never sent to this page.</p></section>
+<p class="muted">Passwords, signing keys, GPU service credentials and OAuth tokens are never sent to this page.</p></section>
 <section class="panel-card"><h2>Recent security activity</h2><div id="audit" class="muted">Loading…</div></section>
 </div>
 </main></div>
@@ -61,6 +61,7 @@ th,td{padding:10px 12px;border-bottom:1px solid #30405b}
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
+  const localMode = {{ "true" if local_mode else "false" }};
   let csrf = "";
   function status(message, error=false) { $("status").textContent=message; $("status").className="status"+(error?" error":""); }
   async function api(path, method="GET", payload) {
@@ -86,12 +87,12 @@ th,td{padding:10px 12px;border-bottom:1px solid #30405b}
       }
       const access=document.createElement("td");
       access.append(document.createTextNode(user.concat_granted?"Granted ":"Denied "));
-      access.append(action(user.concat_granted?"Revoke":"Grant",()=>api("/api/v1/admin/users/"+encodeURIComponent(user.username)+"/access","POST",{concat_granted:!user.concat_granted})));
+      if(!localMode)access.append(action(user.concat_granted?"Revoke":"Grant",()=>api("/api/v1/admin/users/"+encodeURIComponent(user.username)+"/access","POST",{concat_granted:!user.concat_granted})));
       const sessions=document.createElement("td");
       sessions.append(action("Revoke sessions",()=>api("/api/v1/admin/users/"+encodeURIComponent(user.username)+"/revoke-sessions","POST")));
       tr.append(access,sessions);tbody.append(tr);
     }
-    if(!data.users.length){const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=5;td.textContent="No Scene accounts available";tr.append(td);tbody.append(tr);}
+    if(!data.users.length){const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=5;td.textContent="No accounts available";tr.append(td);tbody.append(tr);}
   }
   async function loadAudit() {
     const data=await api("/api/v1/admin/audit");
@@ -110,7 +111,7 @@ th,td{padding:10px 12px;border-bottom:1px solid #30405b}
       $("maintenance").checked=cfg.maintenance_mode;
       $("max-session").value=cfg.session_max_minutes;
       await Promise.all([loadUsers(),loadAudit()]);
-      status("Verified Scene session · Admin controls active");
+      status(localMode?"Local admin session · Controls active":"Verified Scene session · Admin controls active");
     } catch(e) { status(e.message,true); }
   }
   $("save-config").addEventListener("click",async()=>{
@@ -124,7 +125,7 @@ th,td{padding:10px 12px;border-bottom:1px solid #30405b}
   $("logout").addEventListener("click",async()=>{
     try{
       const response=await fetch("/auth/logout",{method:"POST",credentials:"same-origin",headers:{"X-CSRF-Token":csrf,"Origin":location.origin},redirect:"manual"});
-      if(response.status===303||response.status===0)location.assign("/auth/scene/start");
+      if(response.status===303||response.status===0)location.assign(localMode?"/auth/login":"/auth/scene/start");
       else status("Sign out rejected ("+response.status+")",true);
     }catch(e){status(e.message,true);}
   });

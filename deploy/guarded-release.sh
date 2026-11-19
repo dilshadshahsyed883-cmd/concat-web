@@ -47,10 +47,10 @@ systemctl cat concat-web.service |
   fail "Concat service user mismatch"
 nginx -t >/dev/null 2>&1 || fail "existing nginx config invalid"
 
-# Verify the *live* Scene DB from the Concat service identity, not a copied
-# ownerless fixture. SQLite is opened read-only; no migration or write here.
+# Local administrator is independent of the existing Scene application.
+# Validate root-owned private env and the local login hash; do not expose secrets.
 python3 - <<'PY'
-import pathlib, sqlite3, subprocess, sys
+import base64, pathlib, re, sys
 p = pathlib.Path('/etc/concat-web/concat-web.env')
 values = {}
 for line in p.read_text().splitlines():
@@ -62,22 +62,35 @@ for line in p.read_text().splitlines():
     key, value = line.split('=', 1)
     values[key.strip()] = value.strip().strip('"').strip("'")
 required = (
-    'CONCAT_SCENE_USERS_DB', 'CONCAT_WEB_SECURITY_DB',
-    'CONCAT_SCENE_SSO_SECRET', 'CONCAT_WEB_DATA_ROOT',
-    'CONCAT_WEB_PUBLIC_ORIGIN', 'CONCAT_SCENE_PUBLIC_ORIGIN',
-    'CONCAT_UPLOADER_ENABLED', 'LUM_SESSION_SECRET',
-    'LUM_DATA_DIR', 'CONCAT_CLOUD_RENDER_ROOT',
+    'CONCAT_AUTH_MODE', 'CONCAT_LOCAL_ADMIN_USERNAME',
+    'CONCAT_LOCAL_ADMIN_PASSWORD_HASH', 'CONCAT_LOCAL_SESSION_SECRET',
+    'CONCAT_WEB_SECURITY_DB', 'CONCAT_WEB_DATA_ROOT',
+    'CONCAT_WEB_PUBLIC_ORIGIN', 'CONCAT_UPLOADER_ENABLED',
+    'LUM_SESSION_SECRET', 'LUM_DATA_DIR', 'CONCAT_CLOUD_RENDER_ROOT',
     'CONCAT_WEB_HOST', 'CONCAT_WEB_PORT',
 )
 if any(not values.get(k) for k in required):
-    sys.exit('Missing independent Concat environment setting')
-if len(values['CONCAT_SCENE_SSO_SECRET'].encode()) < 32 or len(values['LUM_SESSION_SECRET'].encode()) < 32:
-    sys.exit('Missing strong SSO/uploader secrets')
-if values['CONCAT_SCENE_SSO_SECRET'] == values['LUM_SESSION_SECRET']:
-    sys.exit('SSO and uploader secrets must be distinct')
+    sys.exit('Missing required independent Concat environment setting')
+if values['CONCAT_AUTH_MODE'] != 'local':
+    sys.exit('Personal deployment requires explicit local authentication mode')
+if len(values['CONCAT_LOCAL_SESSION_SECRET'].encode()) < 32 or len(values['LUM_SESSION_SECRET'].encode()) < 32:
+    sys.exit('Missing strong independent session and uploader secrets')
+if values['CONCAT_LOCAL_SESSION_SECRET'] == values['LUM_SESSION_SECRET']:
+    sys.exit('Local session and uploader secrets must be distinct')
+if not re.fullmatch(r'[^\s/\\:\x00-\x1f\x7f]{1,128}', values['CONCAT_LOCAL_ADMIN_USERNAME']) or values['CONCAT_LOCAL_ADMIN_USERNAME'].casefold() == '__default__':
+    sys.exit('Invalid local administrator name')
+match = re.fullmatch(r'scrypt\$16384\$8\$1\$([A-Za-z0-9_-]{22,86})\$([A-Za-z0-9_-]{43})', values['CONCAT_LOCAL_ADMIN_PASSWORD_HASH'])
+if not match:
+    sys.exit('Invalid local password hash')
+try:
+    salt = base64.urlsafe_b64decode(match[1] + '=' * (-len(match[1]) % 4))
+    digest = base64.urlsafe_b64decode(match[2] + '=' * (-len(match[2]) % 4))
+except ValueError:
+    sys.exit('Invalid local password hash encoding')
+if not (16 <= len(salt) <= 64 and len(digest) == 32):
+    sys.exit('Invalid local password hash size')
 exact = {
     'CONCAT_WEB_PUBLIC_ORIGIN': 'https://concat.scenebuilder.online',
-    'CONCAT_SCENE_PUBLIC_ORIGIN': 'https://app.scenebuilder.online',
     'CONCAT_WEB_HOST': '127.0.0.1',
     'CONCAT_WEB_PORT': '18873',
     'CONCAT_WEB_DATA_ROOT': '/var/lib/concat-web',
@@ -86,26 +99,20 @@ exact = {
     'LUM_DATA_DIR': '/var/lib/concat-web/uploader',
     'CONCAT_CLOUD_RENDER_ROOT': '/var/lib/concat-web',
 }
-if any(values.get(k) != v for k, v in exact.items()):
+if any(values.get(k) != v for k,v in exact.items()):
     sys.exit('Unexpected Concat isolation or HTTPS config')
-scene = pathlib.Path(values['CONCAT_SCENE_USERS_DB']).resolve()
-if not scene.is_file() or scene == pathlib.Path(values['CONCAT_WEB_SECURITY_DB']).resolve():
-    sys.exit('Scene account database missing or unsafe')
-query = '''import sqlite3,sys
-from urllib.parse import quote
-p = quote(sys.argv[1], safe='/')
-c = sqlite3.connect("file:" + p + "?mode=ro", uri=True, timeout=5)
-c.execute('PRAGMA query_only=ON')
-c.execute('SELECT username,is_active,is_admin FROM users LIMIT 0')
-c.execute('SELECT sid_hash,username_key,expires_at,revoked_at FROM concat_sso_sessions LIMIT 0')
-'''
-p = subprocess.run(['runuser', '-u', 'concatweb', '--', 'python3', '-c', query, str(scene)], capture_output=True, text=True)
-if p.returncode:
-    sys.exit('Concat cannot read live Scene users + revocable sessions read-only')
-print('Concat SSO SQLite read-only readiness: PASS')
+db = pathlib.Path(values['CONCAT_WEB_SECURITY_DB'])
+if db.is_symlink() or db.parent.is_symlink() or not db.parent.is_dir():
+    sys.exit('Local session database path is unsafe')
+if db.exists():
+    import stat
+    info = db.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_mode & 0o077:
+        sys.exit('Existing local session database is not private')
+print('Concat local administrator and private storage readiness: PASS')
 PY
 if [[ "$MODE" == preflight ]]; then
-  echo "PASS: private tailnet host, isolated service and Scene SSO read-only checks; NO deployment"
+  echo "PASS: isolated Concat service and local admin security; NO deployment"
   exit 0
 fi
 

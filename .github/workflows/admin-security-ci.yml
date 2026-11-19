@@ -5,6 +5,7 @@ on:
       - 'app/auth.py'
       - 'app/modules/admin/**'
       - 'tests/test_admin_security.py'
+      - 'tests/test_local_admin.py'
       - '.github/workflows/admin-security-ci.yml'
   workflow_dispatch:
 permissions:
@@ -26,5 +27,7 @@ jobs:
         run: python -m compileall -q app
       - name: Negative security acceptance tests
         run: python -m unittest discover -s tests -p 'test_admin_security.py' -v
+      - name: Independent personal-admin login and session tests
+        run: python -m unittest discover -s tests -p 'test_local_admin.py' -v
       - name: Baseline authentication regression tests
         run: python -m unittest discover -s tests -p 'test_foundation.py' -v

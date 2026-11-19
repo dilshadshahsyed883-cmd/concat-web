@@ -1,13 +1,19 @@
-# Independent Concat Web release gates (public cutover NOT yet authorized)
+# Concat Web personal-admin release gates (manual VPS terminal, not yet deployed)
 
-1. Confirm DNS and TLS for proposed `concat.scenebuilder.online` via separate read-only discovery.
-2. Inventory exact VPS_1 ports, Nginx locations, Linux users and production services; check collisions with 18873.
-3. Verify Agent 5 Scene-session SSO: secure cookies or server-verified auth_request, role refresh, session revocation and anti-forgery. Never trust arbitrary inbound identity headers.
-4. Verify owner-bound Cloud Render media/job/config/ingest callbacks and quarantine unknown legacy owners (audit PR #768).
-5. Verify owner+app uploader queues, channels, Sheets/OAuth tokens and canonical Drive-backed media handoff (PR #770 contract). Preserve Copy Video Link URL and Drive Bridge canonical identity/verification/cleanup.
-6. Test Alice, Bob and admin (admin as own owner) on all API reads/writes, copied URLs, direct guessed IDs and worker callbacks.
-7. Validate complete suite, real provider smoke in controlled mode and effective TLS/NGINX config without touching current routes.
-8. Snapshot independent release and persistent state (consistent SQLite backup where appropriate). Keep previous working service and Nginx config.
-9. Use the manually approved, SHA-pinned `deploy.yml` workflow from protected `main` to stage the independent Concat unit **on loopback only**; keep existing public Nginx placeholder/routes unchanged. Never deploy from feature branches. Do not alter the host-installed Drive Bridge.
-10. Before public activation: verify live Scene issuer deployment/schema, same independent HMAC key, ticket URL logging redaction, real two-user/admin browser SSO + revocation and controlled GPU → verified MP4 → Uploader acceptance against the staged unit. Only then authorize a separate, backed-up Concat-only Nginx cutover. Afterwards test public /healthz, authenticated UI, owner isolation, Nginx -t and existing app.scenebuilder.online. On failure roll back only the Concat unit/release/route. Preserve queues and data.
-Integration PR #7 and upstream issuer PR #773 are merged in source, but actual Scene issuer deployment and cross-app signing/access remain unverified. Production public activation remains gated; historical release blockers are documented in docs/FINAL_INTEGRATION_BLOCKERS_20261118.md. Do not treat isolated tests or a loopback 200 as live SSO/Salad/YouTube acceptance.
+## Design and test prerequisites
+1. Only one configured local Concat administrator. Require strong scrypt hashed password, root-owned private environment and independent 32+ byte session secret. No hard-coded credentials, no anonymous fallback, no public signup, no Scene DB or SSO dependency in explicit local mode.
+2. Confirm protected UI/API reads and mutations enforce auth, CSRF, origin, revocable session, expiration, hashed credential verification and durable rate limiting. Foreign, ownerless and '__default__' rows remain quarantined, including admin and worker interactions.
+3. Preserve the copied Cloud Render, Salad GPU, canonical Drive Bridge, verified MP4, OAuth/channel and persistent uploader queues. Verify owner-bound ingest/token and uploader bridge. Tests with fixtures are *not* a real Salad/YouTube acceptance run.
+4. Run focused tests and build from the Concat repo: admin security (both legacy Scene fixture and new local-admin tests), foundation, reused modules, uploader contracts and guarded-helper syntax. CI must pass before merge. GitHub Actions is **not** a deployment mechanism.
+
+## Safe manual release sequence (separately authorized)
+1. Review PR, verify CI and merge verified code to protected 'concat-web/main'. Pin exact SHA, verify remote main identity and package that exact SHA.
+2. Back up Concat private state and existing Concat helper/unit/Nginx routes before changing them. Preserve VPS_1/Scene production and other applications.
+3. Root operator creates /etc/concat-web/concat-web.env mode 0600, with the local admin password hash and distinct random secrets generated only on VPS; never include secret values in GitHub, chat, terminal screenshots or shell trace.
+4. The *currently installed* host /usr/local/sbin/concat-web-deploy may still require Scene SSO. Replace it only after verifying the new source/script digest and root-only permissions, preserving a rollback copy. Never invoke a stale helper for the new mode.
+5. Run the new host-installed helper: 'preflight <verified-main-sha>'. Confirm it has no Scene DB/SSO requirements. Then secure-upload the checksum-verified package and run 'deploy <sha> <archive> <digest>' for Concat-only loopback service.
+6. Confirm /healthz, 401 on anonymous endpoints, 200 on local-admin login and authenticated dashboard, CSRF enforcement, session revocation, Concat-only storage, and no regression on 'app.scenebuilder.online'.
+7. With backup and rollback, configure separate HTTPS/Nginx routing for 'concat.scenebuilder.online'; Nginx -t, test public login and private endpoints. Restore only Concat release/route on failure. Never restart Scene, alter Drive Bridge/OAuth/Salad or deploy via GitHub Actions.
+8. Real GPU → checksum-verified MP4 → uploader queue → controlled YouTube/OAuth acceptance remains a distinct live integration check before declaring the entire workflow production ready.
+
+Historical Scene SSO audit and the failed VPS1 LUT staging release remain recorded in 'docs/VPS_TERMINAL_DEPLOY_AUDIT_20261119.md', but are not prerequisites for personal local-admin deployment.

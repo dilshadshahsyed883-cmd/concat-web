@@ -4,8 +4,9 @@ Scene remains the authority for user accounts and roles; this app controls
 only Concat grants, app configuration and its own revocable sessions.
 """
 from pathlib import Path
+import os
 import secrets
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -23,8 +24,60 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 PRIVATE = {"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "no-referrer"}
 
 
+def _local_only(request: Request):
+    if os.environ.get("CONCAT_AUTH_MODE", "scene").strip() != "local":
+        raise HTTPException(404, "Local login not available")
+    service = get_security(request)
+    if not getattr(service, "is_local", False):
+        raise HTTPException(503, "Local authentication unavailable")
+    return service
+
+
+def _same_origin(request: Request, allowed: str) -> None:
+    origin = request.headers.get("origin", "")
+    referer = request.headers.get("referer", "")
+    if origin:
+        if origin.rstrip("/") != allowed:
+            raise HTTPException(403, "Login origin rejected")
+    elif referer:
+        parsed = urlsplit(referer)
+        if parsed.scheme + "://" + parsed.netloc != allowed:
+            raise HTTPException(403, "Login origin rejected")
+    else:
+        raise HTTPException(403, "Login origin required")
+
+
+@router.get("/auth/login", response_class=HTMLResponse)
+async def local_login_page(request: Request):
+    _local_only(request)
+    return templates.TemplateResponse(
+        request=request, name="login.html", context={},
+        headers=PRIVATE,
+    )
+
+
+@router.post("/auth/login")
+async def local_login_post(request: Request):
+    service = _local_only(request)
+    _same_origin(request, service.web_origin)
+    if not request.headers.get("content-type", "").startswith("application/x-www-form-urlencoded"):
+        raise HTTPException(415, "Form submission required")
+    form = await request.form()
+    username, password = form.get("username"), form.get("password")
+    if not isinstance(username, str) or not isinstance(password, str):
+        raise HTTPException(401, "Invalid username or password")
+    token, max_age = service.login(username, password, request)
+    service.revoke_cookie(request)  # rotate prior browser session
+    response = RedirectResponse("/dashboard", status_code=303, headers=PRIVATE)
+    response.set_cookie(COOKIE, token, max_age=max_age, secure=True,
+                        httponly=True, samesite="lax", path="/")
+    return response
+
+
 @router.get("/auth/scene/start")
 async def scene_login(request: Request, next: str = "/dashboard"):
+    if os.environ.get("CONCAT_AUTH_MODE", "scene").strip() == "local":
+        raise HTTPException(404, "Scene login disabled in personal mode")
     service = get_security(request)
     state = secrets.token_urlsafe(32)
     # The upstream issuer MUST require a real active Scene session and use
@@ -45,6 +98,8 @@ async def scene_login(request: Request, next: str = "/dashboard"):
 
 @router.get("/auth/scene/callback")
 async def scene_callback(request: Request, ticket: str = "", state: str = ""):
+    if os.environ.get("CONCAT_AUTH_MODE", "scene").strip() == "local":
+        raise HTTPException(404, "Scene login disabled in personal mode")
     service = get_security(request)
     cookie_state = request.cookies.get(STATE_COOKIE, "")
     if not cookie_state or len(cookie_state) < 32 or len(state) > 200 or not secrets.compare_digest(cookie_state, state):
@@ -73,7 +128,8 @@ async def csrf_token(request: Request, _: Principal = Depends(current_principal)
 @router.post("/auth/logout", dependencies=[Depends(require_csrf)])
 async def logout(request: Request, _: Principal = Depends(current_principal)):
     get_security(request).revoke_cookie(request)
-    response = RedirectResponse("/auth/scene/start", status_code=303, headers=PRIVATE)
+    response = RedirectResponse("/auth/login" if getattr(get_security(request), "is_local", False) else "/auth/scene/start",
+                                status_code=303, headers=PRIVATE)
     response.delete_cookie(COOKIE, path="/", secure=True, httponly=True)
     return response
 
@@ -82,7 +138,7 @@ async def logout(request: Request, _: Principal = Depends(current_principal)):
 async def admin(request: Request, principal: Principal = Depends(admin_principal)):
     return templates.TemplateResponse(
         request=request, name="admin.html",
-        context={"principal": principal}, headers=PRIVATE,
+        context={"principal": principal, "local_mode": getattr(get_security(request), "is_local", False)}, headers=PRIVATE,
     )
 
 
@@ -115,8 +171,10 @@ async def revoke_user_sessions(username: str, request: Request,
 @router.get("/api/v1/admin/config")
 async def config(request: Request, _: Principal = Depends(admin_principal)):
     service = get_security(request)
-    return JSONResponse({"config": service._config(), "scene_origin": service.scene_origin,
-                         "scene_identity": "read-only", "secrets_exposed": False}, headers=PRIVATE)
+    return JSONResponse({"config": service.config() if getattr(service, "is_local", False) else service._config(),
+                         "scene_origin": getattr(service, "scene_origin", None),
+                         "scene_identity": "not-used" if getattr(service, "is_local", False) else "read-only",
+                         "secrets_exposed": False}, headers=PRIVATE)
 
 
 class ConfigBody(BaseModel):

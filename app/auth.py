@@ -1,7 +1,7 @@
-"""Single verified Scene identity and owner-authorization contract.
+"""Verified local-admin or Scene identity and strict owner-authorization contract.
 
-Injected resolvers remain available for isolated integration tests, never from an
-HTTP header. In deployed mode, only revocable, Scene-verified SSO may log in.
+Injected resolvers remain available for isolated tests, never from an HTTP
+header. Production always requires a revocable, server-verified session.
 """
 from dataclasses import dataclass
 import inspect
@@ -42,7 +42,7 @@ async def current_principal(request: Request) -> Principal:
                 request.app.state.concat_security = service
             principal = service.authenticate(request)
         except SecurityUnavailable:
-            raise HTTPException(401, "Verified Scene authentication unavailable") from None
+            raise HTTPException(401, "Verified authentication unavailable") from None
     if not isinstance(principal, Principal) or not principal.valid() or not principal.is_active:
         raise HTTPException(status_code=401, detail="Active authenticated session required")
     if not principal.concat_granted:
