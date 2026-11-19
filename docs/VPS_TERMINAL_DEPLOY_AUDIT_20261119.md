@@ -119,3 +119,55 @@ Interpretation:
 Verify the correct active Scene service configuration and approved secret provisioning path **without exposing environment values**. Confirm the upstream issuer release was tested and approved independently in `vps1-deploy-control`; use only the established VPS1 guarded deployment/rollback process, never manual SQL migration or bypass. After the authorized upstream rollout, recheck the issuer file, SSO table, live session revocation, and Concat user read-only DB access. Only then proceed with Concat's private env, strict preflight and loopback deployment.
 
 **Do not modify Scene services, perform an Ubuntu upgrade/reboot, start Concat, or open public Concat ingress based on these read-only audits alone.**
+
+
+## Attempted guarded upstream Scene release — FAILED (2026-11-19)
+
+Operator invoked the existing host-installed VPS1 helper from the VPS terminal, targeting exact GitHub `main` SHA `6a34d5a34f3974dea0c4a3f919c3ae5fe9b2e53d` with `install <sha> scene-builder`. The operator's shell confirmed remote `main` matched that SHA and live Scene health checks passed **before** release.
+
+A private `CONCAT_SCENE_SSO_SECRET` was generated and inserted into `/etc/fresh-website/scene-builder.env` with an on-host, root-only backup `scene-builder.env.before-concat-sso`. Output reported `SCENE_SSO_SECRET=CONFIGURED`. **The secret's value was not printed and must never enter GitHub.** This is an actual VPS configuration change, unlike previous read-only audits.
+
+**Observed release failure:**
+
+```text
+SCENE_WORKER_HOME_ALREADY_VERIFIED=PASS
+SCENE_WORKER_HOME_ROLLBACK=PASS PROJECTS=PRESERVED
+RuntimeError: Scene production worker: Scene builtin LUT preparation/FFmpeg proof failed:
+ModuleNotFoundError: No module named 'smart_scroll'
+...
+CalledProcessError: ... production.runtime install --revision 6a34d5a34f3974dea0c4a3f919c3ae5fe9b2e53d --apps scene-builder
+```
+
+There were also multiple Python `SyntaxWarning: invalid escape sequence '\\,'` messages. The exception in the LUT proof, rather than the warnings, is the reported fatal error.
+
+**Source investigation (same exact VPS1 SHA):**
+- `production/scene_lut_assets.py` invokes the unprivileged `vps1scene` worker's Python with `PYTHONPATH=<candidate>/part02` and imports `smart_scroll.lut_engine`.
+- The tracked source actually contains `apps/scene-builder/part02/smart_scroll/__init__.py` and `smart_scroll/lut_engine.py`.
+- `production/scene_candidate_release.py::_stage` calls `target.mkdir(parents=True)` and child `path.parent.mkdir(..., exist_ok=True)` without explicit directory permissions.
+- The operator ran `sudo bash` with `umask 077`; if inherited, newly created **root-owned release directories** may be mode `0700`, making the otherwise-present package inaccessible to `vps1scene`. This is a **strong hypothesis, not yet proven**; read-only `namei -l`/worker import evidence is required. Another possibility is wrong/incomplete stage mapping.
+
+**Important: failed install does not prove successful rollback or current service state.** A worker-HOME rollback message covers only that operation. Check current candidate symlink, service health, issuer file, DB schema and permissions before any retry. No Concat Web deployment occurred.
+
+### Safe read-only diagnosis
+
+```bash
+sudo bash <<'SH'
+set -Eeuo pipefail
+SOURCE='/srv/fresh-website/releases/scene-builder/6a34d5a34f3974dea0c4a3f919c3ae5fe9b2e53d/part02'
+echo '=== SOURCE AND PATH PERMISSIONS ==='
+test -f "$SOURCE/smart_scroll/lut_engine.py" && echo 'LUT_SOURCE=EXISTS' || echo 'LUT_SOURCE=MISSING'
+namei -l "$SOURCE/smart_scroll/lut_engine.py"
+echo '=== WORKER ACCESS ==='
+runuser -u vps1scene -- test -r "$SOURCE/smart_scroll/lut_engine.py" && echo 'WORKER_FILE_READ=YES' || echo 'WORKER_FILE_READ=NO'
+runuser -u vps1scene -- /usr/bin/env -i PATH=/usr/bin:/bin PYTHONPATH="$SOURCE" /srv/fresh-website/venvs/scene-production-worker/bin/python -c 'from smart_scroll import lut_engine; print("WORKER_IMPORT=PASS")' || echo 'WORKER_IMPORT=FAIL'
+echo '=== POST-FAILURE HOST STATUS ==='
+systemctl is-active vps1-scene-candidate.service || true
+readlink -f /srv/fresh-website/current/scene-builder
+curl -sS -o /dev/null -w 'SCENE_HEALTH_HTTP=%{http_code}\n' --max-time 8 http://127.0.0.1:18080/health || true
+echo 'SSO_ISSUER_FILE_CHECK='
+test -f /srv/fresh-website/current/scene-builder/part01/concat_sso_issuer.py && echo PRESENT || echo MISSING
+echo 'CHANGES=NONE'
+SH
+```
+
+**Do not** apply arbitrary `chmod -R` to production trees, pip-install `smart_scroll` from PyPI, inject `sys.path`, skip LUT proof, restart services or retry the release blindly. If permissions are confirmed, fix the immutable source staging permissions **in the VPS1 source repository with tests and a separate PR**, then use the normal guarded release after CI. Keep this Concat-Web PR as the cross-app audit record.
