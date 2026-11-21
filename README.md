@@ -23,6 +23,17 @@ Concat stores each user's videos and jobs in a private per-owner SQLite director
 
 Fixtures verify a signed-in receiver's simulated output, verified MP4, copied persistent queue, dashboard, owner isolation, CSRF, and legacy quarantine. Tests do not publish live YouTube videos or invoke Salad GPU.
 
-## Release status
+## Release status and historical blockers
+
+Source review on 21 November 2026 found a guarded release workflow in `.github/workflows/deploy.yml`. Its presence does not prove that deployment gates are enabled or that a release is live. The following integration status records the earlier source handoff; reconcile it with the exact release and current runtime evidence before deployment.
+
 
 No merge or deployment authorized. Upstream Scene SSO issuer/session table is pending in VPS_1 issue #772. Real OAuth/YouTube/Salad and full multi-user deployed verification require controlled non-production staging after SSO. See docs/FINAL_INTEGRATION_BLOCKERS_20261118.md and deploy/RELEASE_GATES.md. Main, VPS_1 production data, secrets, Nginx, and GPU images are untouched.
+
+## Local development
+
+Use Python 3.11 or newer in a virtual environment, then install the test dependencies shown above. `python run.py` starts the dedicated loopback listener at `127.0.0.1:18873` by default. Protected features require the configured Scene SSO integration; local startup does not bypass authentication. Configuration examples and release prerequisites are in [deploy/RELEASE_GATES.md](deploy/RELEASE_GATES.md).
+
+## Repository maintenance
+
+See the [repository guide](docs/REPOSITORY_GUIDE.md) for source ownership, validation and release/storage policy, and [CONTRIBUTING.md](CONTRIBUTING.md) for changes and review.
